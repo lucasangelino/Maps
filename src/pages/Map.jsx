@@ -46,8 +46,6 @@ export default function Map() {
       >
         <Text>Marcadores</Text>
         <Text>Marcadores</Text>
-        <Text>Marcadores</Text>
-        <Text>Marcadores</Text>
       </Collapse>
 
       <Collapse

@@ -1,10 +1,11 @@
-
-
+const MarkerList = require('./markerList');
 class Sockets {
 
     constructor( io ) {
 
         this.io = io;
+
+        this.markers = new MarkerList();
 
         this.socketEvents();
     }
@@ -13,11 +14,17 @@ class Sockets {
         // On connection
         this.io.on('connection', ( socket ) => {
 
-            // Escuchar evento: mensaje-to-server
-            socket.on('mensaje-to-server', ( data ) => {
-                console.log( data );
+            socket.emit( 'marcadores-activos' , this.markers.activos );
+
+            socket.on( 'marcador-nuevo', ( marcador ) => {  // { id, lng, lat }
+                this.markers.agregarMarcador( marcador );
                 
-                this.io.emit('mensaje-from-server', data );
+                socket.broadcast.emit( 'marcador-nuevo', marcador )
+            });
+
+            socket.on( 'marcador-actualizado', (marcador) => {
+                this.markers.actualizarMarcador( marcador );
+                socket.broadcast.emit( 'marcador-actualizado', marcador );
             });
             
         

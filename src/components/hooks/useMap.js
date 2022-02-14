@@ -6,65 +6,100 @@ import { Subject } from "rxjs";
 mapboxgl.accessToken =
   "pk.eyJ1IjoibHVjYXNhbmdlbGlubyIsImEiOiJja3ppcDlmOG8wMmFkMm9xa2RnNHVqbGw0In0.DsyXRtX1sdB1LeTh0iKOCQ";
 
-export default function useMap({ initialPoint }) {
-  const mapRef = useRef();
-  const map = useRef();
-  const setRef = useCallback((node) => {
-    mapRef.current = node;
-  }, []);
-  const markers = useRef({});
-  const [coords, setCoords] = useState(initialPoint);
+export default function useMap( puntoInicial) {
+  // Referencia al DIV del mapa
+  const mapaDiv = useRef();
+  const setRef = useCallback( (node) => {
+      mapaDiv.current = node;
+  },[]);
 
-  const markerMovement = useRef(new Subject());
-  const newMarker = useRef(new Subject());
+  // Referencia los marcadores
+  const marcadores = useRef({});
 
-  const addMarker = useCallback((ev) => {
-    const { lng, lat } = ev.lngLat;
-    const marker = new mapboxgl.Marker();
-    marker.id = v4();
-    marker.setLngLat([lng, lat]).addTo(map.current).setDraggable(true);
-    markers.current[marker.id] = marker;
+  // Observables de Rxjs
+  const movimientoMarcador = useRef( new Subject() );
+  const nuevoMarcador = useRef( new Subject() );
 
-    newMarker.current.next(marker);
+  // Mapa y coords
+  const mapa = useRef();
+  const [ coords, setCoords ] = useState( puntoInicial );
 
-    marker.on("dragend", (ev) => {
-      const { id } = ev.target;
-      const { lng, lat } = ev.target.getLngLat();
-      markerMovement.current.next({ id, lng, lat });
-    });
-  }, []);
+  // función para agregar marcadores
+  const agregarMarcador = useCallback( (ev, id ) => {
 
-  useEffect(() => {
-    const mapbox = new mapboxgl.Map({
-      container: mapRef.current,
-      style: "mapbox://styles/mapbox/streets-v11",
-      center: [initialPoint.lng, initialPoint.lat],
-      zoom: initialPoint.zoom,
-    });
-    map.current = mapbox;
-  }, [initialPoint]);
+      const { lng, lat } = ev.lngLat || ev;
 
-  useEffect(() => {
-    map.current?.on("move", () => {
-      const { lng, lat } = map.current.getCenter();
-      setCoords({
-        lng: lng.toFixed(4),
-        lat: lat.toFixed(4),
-        zoom: map.current.getZoom().toFixed(2),
+      const marker = new mapboxgl.Marker();
+      marker.id = id ?? v4();
+      
+      marker
+          .setLngLat([ lng, lat ])
+          .addTo( mapa.current )
+          .setDraggable( true );
+
+      // Asignamos al objeto de marcadores
+      marcadores.current[ marker.id ] = marker;
+
+      if ( !id ) {
+          nuevoMarcador.current.next({
+              id: marker.id,
+              lng, 
+              lat
+          });
+      }
+
+      // escuchar movimientos del marcador
+      marker.on('drag', ({ target }) => {
+          const { id } = target;
+          const { lng, lat } = target.getLngLat();
+          movimientoMarcador.current.next({ id, lng, lat });
       });
-    });
-  }, []);
 
+  },[]);
+
+  // Funcion para actualizar la ubicación del marcador
+  const actualizarPosicion = useCallback( ({ id, lng, lat }) => {
+      marcadores.current[id].setLngLat([ lng, lat ]);
+  },[])
+
+  useEffect( () => {
+      const map = new mapboxgl.Map({
+          container: mapaDiv.current,
+          style: 'mapbox://styles/mapbox/streets-v11',
+          center: [ puntoInicial.lng, puntoInicial.lat ],
+          zoom: puntoInicial.zoom
+      });
+      
+      mapa.current = map;
+  },[ puntoInicial ]);
+
+  // Cuando se mueve el mapa
   useEffect(() => {
-    map.current?.on("click", addMarker);
-  }, [addMarker]);
+
+      mapa.current?.on('move', () => {
+          const { lng, lat } = mapa.current.getCenter();
+          setCoords({
+              lng: lng.toFixed(4),
+              lat: lat.toFixed(4),
+              zoom: mapa.current.getZoom().toFixed(2)
+          })
+      });
+
+  },[]);
+
+  // Agregar marcadores cuando hago click
+  useEffect(() => {
+      mapa.current?.on('click', agregarMarcador );
+  }, [agregarMarcador]);
+
 
   return {
-    addMarker,
-    setRef,
-    newMarker$: newMarker.current,
-    markerMovement$: markerMovement.current,
-    coords,
-    markers,
-  };
+      agregarMarcador,
+      actualizarPosicion,
+      coords,
+      marcadores,
+      nuevoMarcador$: nuevoMarcador.current,
+      movimientoMarcador$: movimientoMarcador.current,
+      setRef
+  }
 }

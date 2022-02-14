@@ -1,31 +1,57 @@
-import React, { useState, useEffect, useRef } from "react";
-
+import React, { useContext, useEffect } from "react";
+import { SocketContext } from "../context/SocketContext";
 // css framework
-import { Container, Row, Col, Collapse, Text } from "@nextui-org/react";
+import { Collapse, Text } from "@nextui-org/react";
 import useMap from "../components/hooks/useMap";
 
-const initialPoint = {
-  lng: -58.4764,
-  lat: -34.5849,
-  zoom: 13,
-};
+const puntoInicial = {
+  lng: -122.4725,
+  lat: 37.8010,
+  zoom: 13.5
+}
 
 export default function Map() {
-  const { coords, setRef, newMarker$, markerMovement$ } = useMap({
-    initialPoint,
-  });
+  const { setRef, coords, nuevoMarcador$, movimientoMarcador$, agregarMarcador, actualizarPosicion } = useMap( puntoInicial );
+    const { socket } = useContext( SocketContext );
 
-  useEffect(() => {
-    newMarker$.subscribe((marker) => {
-      console.log(marker);
-    });
-  }, [newMarker$]);
+    // Escuchar los marcadores existentes
+    useEffect(() => {
+        socket.on( 'marcadores-activos', (marcadores) => {
+            for( const key of Object.keys( marcadores ) ) {
+                agregarMarcador( marcadores[key], key );
+            }
+        });
+    }, [ socket, agregarMarcador ])
 
-  useEffect(() => {
-    markerMovement$.subscribe((marker) => {
-      console.log("move", marker);
-    });
-  }, [markerMovement$]);
+    // Nuevo marcador
+    useEffect(() => {
+        nuevoMarcador$.subscribe( marcador => {
+            socket.emit( 'marcador-nuevo', marcador );
+        });
+    }, [nuevoMarcador$, socket]);
+
+    // Movimiento de Marcador
+    useEffect(() => {
+        movimientoMarcador$.subscribe( marcador => {
+            socket.emit( 'marcador-actualizado', marcador );
+        });
+    }, [socket, movimientoMarcador$]);
+
+    // Mover marcador mediante sockets
+    useEffect( () => {
+        socket.on( 'marcador-actualizado', ( marcador) => {
+            actualizarPosicion( marcador );
+        })
+    },[ socket, actualizarPosicion ])
+    
+    // Escuchar nuevos marcadores
+    useEffect(() => {
+        
+        socket.on('marcador-nuevo', ( marcador ) => {
+            agregarMarcador( marcador, marcador.id );
+        });
+
+    }, [socket, agregarMarcador])
 
   return (
     <>
@@ -44,29 +70,6 @@ export default function Map() {
           border: "none",
         }}
       >
-        <Text>Marcadores</Text>
-        <Text>Marcadores</Text>
-      </Collapse>
-
-      <Collapse
-        shadow
-        title={
-          <Text h4 color="white">
-            Lugares
-          </Text>
-        }
-        subtitle={<Text color="white">Lugares destacados</Text>}
-        css={{
-          width: "400px",
-          margin: "10px",
-          background: "#111111",
-          border: "none",
-        }}
-      >
-        <Text>New York</Text>
-        <Text>Las Vegas</Text>
-        <Text>Rio de Janeiro</Text>
-        <Text>Marcadores</Text>
       </Collapse>
       <div ref={setRef} className="mapContainer"></div>
     </>
